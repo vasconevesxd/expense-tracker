@@ -1,156 +1,79 @@
 <script lang="ts" setup>
-  import { api } from '@/boot/axios'
-  import { useDialogPluginComponent } from 'quasar'
+  import ExpensesTable from '@/features/expenses/ExpensesTable.vue'
+  import ExpensesActionsDialog from '@/features/expenses/ExpensesActionsDialog.vue'
+  import { useExpenses } from '@/features/expenses/composables/useExpenses'
+  import {
+    createExpense,
+    deleteExpense,
+    updateExpense,
+  } from '@/features/expenses/services'
+  import type { Expense } from '@/features/expenses/types'
+  import CategoriesActionsDialog from '@/features/categories/CategoriesActionsDialog.vue'
+  import { createCategory } from '@/features/categories/services'
+  import type { Category } from '@/features/categories/types'
 
-  const { dialogRef, onDialogHide } = useDialogPluginComponent()
+  const { expenses } = useExpenses()
 
-  const expenses = ref()
+  const dialogVisible = ref(false)
+  const isNewExpense = ref(false)
+  const selectedExpense = ref<Expense | null>(null)
 
-  api.get('/expenses').then(response => {
-    expenses.value = response.data
-  })
+  const dialogVisibleCategory = ref(false)
 
-  const expense = ref()
-
-  function openDialog(currentExpense: any) {
-    expense.value = currentExpense
-    dialogRef.value = true
+  const openDialog = (expense: Expense) => {
+    selectedExpense.value = expense
+    isNewExpense.value = false
+    dialogVisible.value = true
   }
 
-  function deleteExpense(currentExpense: any) {
-    api.delete(`/expenses/${currentExpense.id}`).then(() => {
-      expenses.value = expenses.value.filter(
-        (e: any) => e.id !== currentExpense.id
-      )
-    })
-    dialogRef.value = false
-    onDialogHide()
-    expense.value = null
+  const openDialogCategory = () => {
+    dialogVisibleCategory.value = true
   }
 
-  function editExpense() {
-    api
-      .put(`/expenses/${expense.value.id}`, {
-        category_id: expense.value.category_id,
-        amount: expense.value.amount,
-      })
-      .then(() => {
-        expenses.value = expenses.value.map((e: any) =>
-          e.id === expense.value.id
-            ? {
-                ...e,
-                category_id: expense.value.category_id,
-                amount: expense.value.amount,
-              }
-            : e
-        )
-      })
-    dialogRef.value = false
-    onDialogHide()
-    expense.value = null
+  const newCategory = (category: Category) => {
+    createCategory(category)
+    dialogVisibleCategory.value = false
   }
 
-  function openDialogExpense() {
-    dialogRef.value = true
-    expense.value = {
-      category_id: '',
-      amount: '',
+  watch(
+    () => dialogVisible.value,
+    () => {
+      if (dialogVisible.value) return
+      selectedExpense.value = null
     }
-  }
-
-  function openDialogCategory() {
-    dialogCategoryRef.value = true
-    expense.value = {
-      name: '',
-    }
-  }
-
-  function addCategory() {
-    api.post('/expense-categories', { name: expense.value.name }).then(() => {
-      expenses.value = expenses.value.map((e: any) =>
-        e.id === expense.value.id ? { ...e, name: expense.value.name } : e
-      )
-    })
-    dialogCategoryRef.value = false
-    onDialogHide()
-    expense.value = null
-  }
-
-  const dialogCategoryRef = ref()
+  )
 </script>
 
 <template>
   <q-page padding>
-    <div class="text-h4 q-mb-md">Expenses</div>
-    <div class="flex justify-end gap-2">
-      <q-btn label="Add Expense" color="primary" @click="openDialogExpense" />
-      <q-btn label="Add Category" color="primary" @click="openDialogCategory" />
-    </div>
-    <q-list>
-      <q-item v-for="expense in expenses" :key="expense.id">
-        <q-item-section>
-          <q-item-label>{{ expense.category_id }}</q-item-label>
-        </q-item-section>
-        <q-item-section>
-          <q-item-label>{{ expense.amount }}</q-item-label>
-        </q-item-section>
-        <q-item-section side>
-          <q-item-label class="flex justify-center items-center gap-4" caption>
-            <q-icon
-              name="edit"
-              color="primary"
-              size="20px"
-              @click="openDialog(expense)"
-            />
-            <q-icon
-              name="delete"
-              color="negative"
-              size="20px"
-              @click="deleteExpense(expense)"
-            />
-          </q-item-label>
-        </q-item-section>
-      </q-item>
-    </q-list>
-
-    <q-dialog v-model="dialogRef" @hide="onDialogHide">
-      <q-card style="min-width: 350px">
-        <q-card-section>
-          <div class="text-h6">Edit Expense</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none q-gutter-y-md">
-          <q-input v-model="expense.category_id" filled label="Category" />
-          <q-input
-            v-model="expense.amount"
-            filled
-            label="Amount"
-            type="number"
-          />
-        </q-card-section>
-
-        <q-card-actions align="right" class="bg-white text-teal">
-          <q-btn v-close-popup flat label="Cancel" />
-          <q-btn v-close-popup flat label="OK" @click="editExpense" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="dialogCategoryRef" @hide="onDialogHide">
-      <q-card style="min-width: 350px">
-        <q-card-section>
-          <div class="text-h6">Add Category</div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none q-gutter-y-md">
-          <q-input v-model="expense.name" filled label="Name" />
-        </q-card-section>
-
-        <q-card-actions align="right" class="bg-white text-teal">
-          <q-btn v-close-popup flat label="Cancel" />
-          <q-btn v-close-popup flat label="OK" @click="addCategory" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <h5 class="q-mb-md">Expenses</h5>
+    <q-btn
+      label="Add Expense"
+      color="primary"
+      @click="
+        {
+          ;(dialogVisible = true), (isNewExpense = true)
+        }
+      "
+    />
+    <ExpensesTable
+      v-if="expenses"
+      :expenses="expenses"
+      @openDialog="openDialog"
+    />
+    <ExpensesActionsDialog
+      v-model="dialogVisible"
+      :expense="selectedExpense"
+      :isEditing="isNewExpense"
+      @create="createExpense"
+      @update="updateExpense"
+      @delete="deleteExpense"
+      @close="dialogVisible = false"
+      @openDialogCategory="openDialogCategory"
+    />
+    <CategoriesActionsDialog
+      v-model="dialogVisibleCategory"
+      @save="newCategory"
+    />
   </q-page>
 </template>
